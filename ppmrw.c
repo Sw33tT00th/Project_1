@@ -28,9 +28,11 @@ typedef struct Pixel {
 } Pixel;
 
 // FUNCTION SIGNATURES
-int file_exists(char *file_name);
-int check_for_valid_arguments(int argc, char *argv[]);
 int read_header();
+int read_p3(Pixel *content);
+int write_p3(Pixel *content, FILE* output_file);
+int check_for_valid_arguments(int argc, char *argv[]);
+int file_exists(char *file_name);
 int peek_next_char();
 void handle_comment();
 
@@ -40,7 +42,7 @@ Header file_header;
 
 
 /******************************************************************************
-* Main function
+* MAIN
 * Usage: Must call this application with 3 arguments:
 * 		- the type of output desired (3 or 6 for P3 or P6 respectivly)
 * 		- an input file in the .ppm format
@@ -63,13 +65,21 @@ int main(int argc, char *argv[]) {
 		fclose(input_file);
 		return 1;
 	}
+	Pixel content[file_header.width * file_header.height];
+	if(strcmp(file_header.magic_number, "P3") == 0) {
+		error_check = read_p3(content);
+	}
+	if(error_check) {
+		fclose(input_file);
+		return 1;
+	}
 
 	fclose(input_file);
 	return 0;
 }
 
 /******************************************************************************
-* Read Header function
+* READ HEADER
 * Purpose: Reads the header of the input file and store it in a global variable
 * Return value:
 *				0 if file read has a properly formatted .ppm header
@@ -135,10 +145,73 @@ int read_header() {
 }
 
 /******************************************************************************
-* Check for Valid Arguemnts function
+* WRITE HEADER
+* Purpose: Writes the header information into the specified file
+* Return Value:
+*				0 if all went well and all data was accounted for
+******************************************************************************/
+int write_header() {
+	return 0;
+}
+
+/******************************************************************************
+* READ P3
+* Purpose: Reads the file as if it were a P3 formatted ppm file
+* Return Value:
+*				0 if the file was read completely without any errors
+*				1 if the file is shorter than expected based on width x height
+*				2 if the body contains invalid characters
+******************************************************************************/
+int read_p3(Pixel *content) {
+	int i;
+	double temp;
+
+	for (i = 0; i < file_header.width * file_header.height; i++) {
+		while(isspace(peek_next_char())) {
+			fgetc(input_file);
+		}
+		if(peek_next_char() == EOF) {
+			fprintf(stderr, "File ended earlier than expected - Missing Data\n\nClosing Program\n");
+			return 1;
+		}
+		if(!isdigit(peek_next_char())) {
+			fprintf(stderr, "Invalid data in image content\n\nClosing Program\n");
+			return 2;
+		}
+		fscanf(input_file, "%lf", &temp);
+		temp = temp / file_header.max_val; // convert to decimal in range [0, 1]
+		if (i == 0 | i % 3 == 0) {
+			content[i].r = temp;
+			//printf("%d - Red value: %f\n", i, temp);
+		}
+		else if (i % 3 == 2) {
+			content[i].g = temp;
+			//printf("%d - Green value: %f\n", i, temp);
+		}
+		else if (i % 3 == 1) {
+			content[i].b = temp;
+			//printf("%d - Blue value: %f\n", i, temp);
+		}
+	}
+	return 0;
+}
+
+/******************************************************************************
+* WRITE P3
+* Purpose: Writes the data passed in to a file in the P3 format
+* Return Value:
+*				0 if all went well and all data was accounted for.
+******************************************************************************/
+int write_p3(Pixel *content, FILE* output_file) {
+	return 0;
+}
+
+/******************************************************************************
+* CHECK FOR VALID ARGUMENTS
 * Purpose: Checks the number of arguments, followed by the arguments themselves
 * 		   to make sure that the arguments are what we need.
-* Return Value: 0 if all arguments are accounted for and are theoretically
+* Return Value:
+*				0 if all arguments are accounted for and are theoretically
 *				valid
 *				1 if there aren't enough arguments
 *				2 if the first argument isn't either 3 or 6
@@ -162,10 +235,11 @@ int check_for_valid_arguments(int argc, char *argv[]) {
 }
 
 /******************************************************************************
-* File Exists function
+* FILE EXISTS
 * Purpose: Check if a file exists
-* Return Value: 1 if the provided file name exists in the file system
+* Return Value:
 * 				0 if the provided file name does not exists in the file system
+*				1 if the provided file name exists in the file system
 ******************************************************************************/
 int file_exists(char *file_name) {
 	if( access( file_name, F_OK ) != -1 ) {
@@ -175,9 +249,9 @@ int file_exists(char *file_name) {
 }
 
 /******************************************************************************
-* Peek Next Character function
+* PEEK NEXT CHARACTER
 * Purpose: Check what the next character in a stream is
-* Return Value: Returns the next character in a stream.
+* Return Value: Returns the next character in the input_file stream.
 ******************************************************************************/
 int peek_next_char() {
 	int c;
@@ -187,7 +261,7 @@ int peek_next_char() {
 }
 
 /******************************************************************************
-* Handle Comment function
+* HANDLE COMMENT
 * Purpose: move the file pointer past the end of a comment
 ******************************************************************************/
 void handle_comment() {
