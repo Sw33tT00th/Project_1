@@ -29,7 +29,7 @@ typedef struct Pixel {
 
 // FUNCTION SIGNATURES
 int read_header();
-int write_header(FILE* output_file);
+int write_header(FILE* output_file, char *format);
 int read_p3(Pixel *content);
 int write_p3(Pixel *content, FILE* output_file);
 int check_for_valid_arguments(int argc, char *argv[]);
@@ -66,18 +66,40 @@ int main(int argc, char *argv[]) {
 		fclose(input_file);
 		return 1;
 	}
+	// initilize the body content array
 	Pixel content[file_header.width * file_header.height];
+	// check if the file input was P3 or P6
 	if(strcmp(file_header.magic_number, "P3") == 0) {
 		error_check = read_p3(content);
 	}
+	else {
+		// handle P6
+	}
+
 	if(error_check) {
 		fclose(input_file);
 		return 1;
 	}
-	FILE* output_file = fopen(argv[3], "w");
-	error_check = write_header(output_file);
-
+	// close input file, we're done with it at this point
 	fclose(input_file);
+
+	// Open new file for output and write header
+	FILE* output_file = fopen(argv[3], "w");
+	write_header(output_file, argv[1]);
+	// check which output format was specified
+	if(strcmp(argv[1], "3") == 0) {
+		error_check = write_p3(content, output_file);
+		// handle error response from write function
+		if(error_check) {
+			fclose(output_file);
+			return 1;
+		}
+	}
+	else {
+		// handle write P6
+	}
+
+	fclose(output_file);
 	return 0;
 }
 
@@ -152,14 +174,18 @@ int read_header() {
 * Purpose: Writes the header information into the specified file
 * Return Value:
 *				0 if all went well and all data was accounted for
+*				1 if the output file failed to open
 ******************************************************************************/
-int write_header(FILE* output_file) {
+int write_header(FILE* output_file, char *format) {
+	if (output_file == NULL) {
+		fprintf(stderr, "Output File failed to open\n\nClosing Program\n");
+		return 1;
+	}
 	char temp[80];
 	// write magic number
-	fputs(file_header.magic_number, output_file);
-	fputc('\n', output_file);
+	sprintf(temp, "P%s\n", format);
+	fputs(temp, output_file);
 	// write dimensions
-	printf("width: %d\nHeight: %d\n", file_header.width, file_header.height);
 	sprintf(temp, "%d %d\n", file_header.width, file_header.height);
 	fputs(temp, output_file);
 	// write max color value
@@ -217,6 +243,7 @@ int read_p3(Pixel *content) {
 *				0 if all went well and all data was accounted for.
 ******************************************************************************/
 int write_p3(Pixel *content, FILE* output_file) {
+
 	return 0;
 }
 
