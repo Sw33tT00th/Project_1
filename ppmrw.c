@@ -29,6 +29,7 @@ typedef struct Pixel {
 
 // FUNCTION SIGNATURES
 int read_header();
+int write_header(FILE* output_file);
 int read_p3(Pixel *content);
 int write_p3(Pixel *content, FILE* output_file);
 int check_for_valid_arguments(int argc, char *argv[]);
@@ -73,6 +74,8 @@ int main(int argc, char *argv[]) {
 		fclose(input_file);
 		return 1;
 	}
+	FILE* output_file = fopen(argv[3], "w");
+	error_check = write_header(output_file);
 
 	fclose(input_file);
 	return 0;
@@ -140,7 +143,7 @@ int read_header() {
 		}
 		
 	}
-	printf("Magic Number: %s\nWidth: %d\nHeight: %d\nMaximum Color Value: %d\n", file_header.magic_number, file_header.width, file_header.height, file_header.max_val);
+	//printf("Magic Number: %s\nWidth: %d\nHeight: %d\nMaximum Color Value: %d\n", file_header.magic_number, file_header.width, file_header.height, file_header.max_val);
 	return 0;
 }
 
@@ -150,7 +153,18 @@ int read_header() {
 * Return Value:
 *				0 if all went well and all data was accounted for
 ******************************************************************************/
-int write_header() {
+int write_header(FILE* output_file) {
+	char temp[80];
+	// write magic number
+	fputs(file_header.magic_number, output_file);
+	fputc('\n', output_file);
+	// write dimensions
+	printf("width: %d\nHeight: %d\n", file_header.width, file_header.height);
+	sprintf(temp, "%d %d\n", file_header.width, file_header.height);
+	fputs(temp, output_file);
+	// write max color value
+	sprintf(temp, "%d\n", file_header.max_val);
+	fputs(temp, output_file);
 	return 0;
 }
 
