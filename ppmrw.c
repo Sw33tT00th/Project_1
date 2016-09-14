@@ -22,16 +22,16 @@ typedef struct Header {
 } Header;
 
 typedef struct Pixel {
-	double r;
-	double g;
-	double b;
+	int r;
+	int g;
+	int b;
 } Pixel;
 
 // FUNCTION SIGNATURES
 int read_header();
 int write_header(FILE* output_file, char *format);
-int read_p3(Pixel *content);
-int write_p3(Pixel *content, FILE* output_file);
+int read_p3();
+int write_p3(FILE* output_file);
 int check_for_valid_arguments(int argc, char *argv[]);
 int file_exists(char *file_name);
 int peek_next_char();
@@ -40,6 +40,7 @@ void handle_comment();
 // GLOBAL VARIABLES
 FILE* input_file;
 Header file_header;
+Pixel *body_content;
 
 
 /******************************************************************************
@@ -68,9 +69,14 @@ int main(int argc, char *argv[]) {
 	}
 	// initilize the body content array
 	Pixel content[file_header.width * file_header.height];
+	body_content = content;
 	// check if the file input was P3 or P6
 	if(strcmp(file_header.magic_number, "P3") == 0) {
-		error_check = read_p3(content);
+		error_check = read_p3();
+		/*int i;
+		for(i = 0; i < file_header.width * file_header.height; i++) {
+			printf("%d - Red: %d Green: %d Blue: %d\n", i, body_content[i].r, body_content[i].g, body_content[i].b);
+		}*/
 	}
 	else {
 		// handle P6
@@ -88,7 +94,7 @@ int main(int argc, char *argv[]) {
 	write_header(output_file, argv[1]);
 	// check which output format was specified
 	if(strcmp(argv[1], "3") == 0) {
-		error_check = write_p3(content, output_file);
+		error_check = write_p3(output_file);
 		// handle error response from write function
 		if(error_check) {
 			fclose(output_file);
@@ -202,35 +208,35 @@ int write_header(FILE* output_file, char *format) {
 *				1 if the file is shorter than expected based on width x height
 *				2 if the body contains invalid characters
 ******************************************************************************/
-int read_p3(Pixel *content) {
+int read_p3() {
 	int i;
-	double temp;
-
+	int j;
 	for (i = 0; i < file_header.width * file_header.height; i++) {
-		while(isspace(peek_next_char())) {
-			fgetc(input_file);
-		}
-		if(peek_next_char() == EOF) {
-			fprintf(stderr, "File ended earlier than expected - Missing Data\n\nClosing Program\n");
-			return 1;
-		}
-		if(!isdigit(peek_next_char())) {
-			fprintf(stderr, "Invalid data in image content\n\nClosing Program\n");
-			return 2;
-		}
-		fscanf(input_file, "%lf", &temp);
-		temp = temp / file_header.max_val; // convert to decimal in range [0, 1]
-		if (i == 0 | i % 3 == 0) {
-			content[i].r = temp;
-			//printf("%d - Red value: %f\n", i, temp);
-		}
-		else if (i % 3 == 2) {
-			content[i].g = temp;
-			//printf("%d - Green value: %f\n", i, temp);
-		}
-		else if (i % 3 == 1) {
-			content[i].b = temp;
-			//printf("%d - Blue value: %f\n", i, temp);
+
+		for (j = 0; j < 3; j++) {
+			// find the next non whitespace character
+			while(isspace(peek_next_char())) {
+				fgetc(input_file);
+			}
+			// check if it's the end of the file
+			if(peek_next_char() == EOF) {
+				fprintf(stderr, "File ended earlier than expected - Missing Data\n\nClosing Program\n");
+				return 1;
+			}
+			// check if the next value is a number
+			if(!isdigit(peek_next_char())) {
+				fprintf(stderr, "Invalid data in image content\n\nClosing Program\n");
+				return 2;
+			}
+			if (j == 0) {
+				fscanf(input_file, "%d", &body_content[i].r);
+			}
+			else if (j == 1) {
+				fscanf(input_file, "%d", &body_content[i].g);
+			}
+			else {
+				fscanf(input_file, "%d", &body_content[i].b);
+			}
 		}
 	}
 	return 0;
@@ -242,8 +248,15 @@ int read_p3(Pixel *content) {
 * Return Value:
 *				0 if all went well and all data was accounted for.
 ******************************************************************************/
-int write_p3(Pixel *content, FILE* output_file) {
+int write_p3(FILE* output_file) {
+	char temp[80];
+	int i;
 
+	for(i = 0; i < file_header.width * file_header.height; i++) {
+		//printf("%d - Red: %d Green: %d Blue: %d\n", i, body_content[i].r, body_content[i].g, body_content[i].b);
+		sprintf(temp, "%d\n%d\n%d\n", body_content[i].r, body_content[i].g, body_content[i].b);
+		fputs(temp, output_file);
+	}
 	return 0;
 }
 
