@@ -22,9 +22,9 @@ typedef struct Header {
 } Header;
 
 typedef struct Pixel {
-	int r;
-	int g;
-	int b;
+	double r;
+	double g;
+	double b;
 } Pixel;
 
 // FUNCTION SIGNATURES
@@ -32,6 +32,8 @@ int read_header();
 int write_header(FILE* output_file, char *format);
 int read_p3();
 int write_p3(FILE* output_file);
+int read_p6(char *file_name);
+int write_p6(FILE* output_file);
 int check_for_valid_arguments(int argc, char *argv[]);
 int file_exists(char *file_name);
 int peek_next_char();
@@ -73,13 +75,9 @@ int main(int argc, char *argv[]) {
 	// check if the file input was P3 or P6
 	if(strcmp(file_header.magic_number, "P3") == 0) {
 		error_check = read_p3();
-		/*int i;
-		for(i = 0; i < file_header.width * file_header.height; i++) {
-			printf("%d - Red: %d Green: %d Blue: %d\n", i, body_content[i].r, body_content[i].g, body_content[i].b);
-		}*/
 	}
 	else {
-		// handle P6
+		error_check = read_p6(argv[2]);
 	}
 
 	if(error_check) {
@@ -95,14 +93,14 @@ int main(int argc, char *argv[]) {
 	// check which output format was specified
 	if(strcmp(argv[1], "3") == 0) {
 		error_check = write_p3(output_file);
-		// handle error response from write function
-		if(error_check) {
-			fclose(output_file);
-			return 1;
-		}
 	}
 	else {
-		// handle write P6
+		error_check = write_p6(output_file);
+	}
+	// handle error response from write function
+	if(error_check) {
+		fclose(output_file);
+		return 1;
 	}
 
 	fclose(output_file);
@@ -211,6 +209,7 @@ int write_header(FILE* output_file, char *format) {
 int read_p3() {
 	int i;
 	int j;
+	double temp;
 	for (i = 0; i < file_header.width * file_header.height; i++) {
 
 		for (j = 0; j < 3; j++) {
@@ -228,14 +227,16 @@ int read_p3() {
 				fprintf(stderr, "Invalid data in image content\n\nClosing Program\n");
 				return 2;
 			}
+			fscanf(input_file, "%lf", &temp);
+			temp = temp / file_header.max_val;
 			if (j == 0) {
-				fscanf(input_file, "%d", &body_content[i].r);
+				body_content[i].r = temp;
 			}
 			else if (j == 1) {
-				fscanf(input_file, "%d", &body_content[i].g);
+				body_content[i].g = temp;
 			}
 			else {
-				fscanf(input_file, "%d", &body_content[i].b);
+				body_content[i].b = temp;
 			}
 		}
 	}
@@ -253,10 +254,52 @@ int write_p3(FILE* output_file) {
 	int i;
 
 	for(i = 0; i < file_header.width * file_header.height; i++) {
-		//printf("%d - Red: %d Green: %d Blue: %d\n", i, body_content[i].r, body_content[i].g, body_content[i].b);
-		sprintf(temp, "%d\n%d\n%d\n", body_content[i].r, body_content[i].g, body_content[i].b);
+		sprintf(temp, "%d\n%d\n%d\n", (int)(body_content[i].r * file_header.max_val), (int)(body_content[i].g * file_header.max_val), (int)(body_content[i].b * file_header.max_val));
 		fputs(temp, output_file);
 	}
+	return 0;
+}
+
+/******************************************************************************
+* READ P6
+* Purpose: Reads the file as if it were a P6 formatted ppm file
+* Return Value:
+*				0 if the file was read completely without any errors
+******************************************************************************/
+int read_p6(char *file_name) {
+	size_t size;
+	if (file_header.max_val < 256) {
+		size = 1;
+	}
+	else if (file_header.max_val > 255) {
+		size = 2;
+	}
+	long int location = ftell(input_file) + 1;
+	fclose(input_file);
+	input_file = fopen(file_name, "rb");
+	fseek(input_file, location, SEEK_SET);
+	int i;
+	for(i = 0; i < file_header.width * file_header.height; i++) {
+		/*
+			two getc functions into seperate integers:
+				first one get's left shifted by 8 bits
+				second get's added to the first
+				check for end of file every time we do a getc
+		*/
+	}
+	fclose(input_file);
+	input_file = fopen(file_name, "r");
+	return 0;
+}
+
+/******************************************************************************
+* WRITE P6
+* Purpose: Writes the data passed in to a file in the P6 format
+* Return Value:
+*				0 if all went well and all data was accounted for.
+******************************************************************************/
+int write_p6(FILE* output_file) {
+
 	return 0;
 }
 
