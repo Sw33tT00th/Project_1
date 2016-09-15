@@ -210,6 +210,7 @@ int write_header(FILE* output_file, char *format) {
 *				0 if the file was read completely without any errors
 *				1 if the file is shorter than expected based on width x height
 *				2 if the body contains invalid characters
+*				3 if the value found is less than 0 or greater than max_val
 ******************************************************************************/
 int read_p3() {
 	int i;
@@ -234,7 +235,8 @@ int read_p3() {
 			}
 			fscanf(input_file, "%lf", &temp);
 			if(temp < 0 || temp > file_header.max_val) {
-				fprintf(stderr, "ERROR: Invalid data. Data value out of range\n\nClosing Program\n")
+				fprintf(stderr, "ERROR: Invalid data. Data value out of range\n\nClosing Program\n");
+				return 3;
 			}
 			temp = temp / file_header.max_val;
 			if (j == 0) {
@@ -274,6 +276,7 @@ int write_p3(FILE* output_file) {
 * Return Value:
 *				0 if the file was read completely without any errors
 *				1 if the end of the file was found unexpectedly
+*				2 if the value found is less than 0 or greater than max_val
 ******************************************************************************/
 int read_p6(char *file_name) {
 	int size;
@@ -306,7 +309,8 @@ int read_p6(char *file_name) {
 			first_byte = fgetc(input_file);
 			if(size == 1) {
 				if(first_byte < 0 || first_byte > file_header.max_val) {
-					fprintf(stderr, "ERROR: Invalid data. Data value out of range\n\nClosing Program\n")
+					fprintf(stderr, "ERROR: Invalid data. Data value out of range\n\nClosing Program\n");
+					return 2;
 				}
 			}
 			if(size == 2) {
@@ -319,7 +323,8 @@ int read_p6(char *file_name) {
 				second_byte = fgetc(input_file);
 				first_byte = first_byte + second_byte;
 				if(first_byte < 0 || first_byte > file_header.max_val) {
-					fprintf(stderr, "ERROR: Invalid data. Data value out of range\n\nClosing Program\n")
+					fprintf(stderr, "ERROR: Invalid data. Data value out of range\n\nClosing Program\n");
+					return 2;
 				}
 			}
 			if(j == 0) {
