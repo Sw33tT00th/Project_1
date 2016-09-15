@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
 	if(error_check) { return 1; } // close if arguments are invalid.
 	// check if input file actually exists
 	if(!file_exists(argv[2])) {
-		fprintf(stderr, "Input file does not exist\n\nClosing Program\n");
+		fprintf(stderr, "ERROR: Input file does not exist\n\nClosing Program\n");
 		return 1;
 	}
 	input_file = fopen(argv[2], "r");
@@ -124,13 +124,13 @@ int read_header() {
 	file_header.magic_number[0] = fgetc(input_file);
 	// check if first character is P
 	if(file_header.magic_number[0] != 'P') {
-		fprintf(stderr, "Invalid File:\n\tFile is not in the PPM format\n\nClosing Program\n");
+		fprintf(stderr, "ERROR: Invalid File:\n\tFile is not in the PPM format\n\nClosing Program\n");
 		return 1;
 	}
 	file_header.magic_number[1] = fgetc(input_file);
 	// check if second character is 3 or 6
 	if(file_header.magic_number[1] != '3' && file_header.magic_number[1] != '6') {
-		fprintf(stderr, "Invalid File:\n\tFile is neither P3 or P6\n\nClosing Program\n");
+		fprintf(stderr, "ERROR: Invalid File:\n\tFile is neither P3 or P6\n\nClosing Program\n");
 		return 2;
 	}
 	int i;
@@ -145,7 +145,7 @@ int read_header() {
 			fscanf(input_file, "%d", &file_header.width);
 			// check if Width value is valid
 			if(file_header.width < 1) {
-				fprintf(stderr, "Invalid image width, must be at least 1px wide\n\nClosing Program\n");
+				fprintf(stderr, "ERROR: Invalid image width, must be at least 1px wide\n\nClosing Program\n");
 				return 3;
 			}
 		}
@@ -154,7 +154,7 @@ int read_header() {
 			fscanf(input_file, "%d", &file_header.height);
 			// check if height value is valid
 			if(file_header.height < 1) {
-				fprintf(stderr, "Invalid image height, must be at least 1px high\n\nClosing Program\n");
+				fprintf(stderr, "ERROR: Invalid image height, must be at least 1px high\n\nClosing Program\n");
 				return 4;
 			}
 		}
@@ -163,7 +163,7 @@ int read_header() {
 			fscanf(input_file, "%d", &file_header.max_val);
 			// check if the maximum color value is valid
 			if(file_header.max_val < 1 || file_header.max_val > 65535) {
-				fprintf(stderr, "Invalid maximum color value, must be between 1 and 65535\n\nClosing Program\n");
+				fprintf(stderr, "ERROR: Invalid maximum color value, must be between 1 and 65535\n\nClosing Program\n");
 				return 5;
 			}
 		}
@@ -187,7 +187,7 @@ int read_header() {
 ******************************************************************************/
 int write_header(FILE* output_file, char *format) {
 	if (output_file == NULL) {
-		fprintf(stderr, "Output File failed to open\n\nClosing Program\n");
+		fprintf(stderr, "ERROR: Output File failed to open\n\nClosing Program\n");
 		return 1;
 	}
 	char temp[80];
@@ -224,15 +224,18 @@ int read_p3() {
 			}
 			// check if it's the end of the file
 			if(peek_next_char() == EOF) {
-				fprintf(stderr, "File ended earlier than expected - Missing Data\n\nClosing Program\n");
+				fprintf(stderr, "ERROR: File ended earlier than expected - Missing Data\n\nClosing Program\n");
 				return 1;
 			}
 			// check if the next value is a number
 			if(!isdigit(peek_next_char())) {
-				fprintf(stderr, "Invalid data in image content\n\nClosing Program\n");
+				fprintf(stderr, "ERROR: Invalid data in image content\n\nClosing Program\n");
 				return 2;
 			}
 			fscanf(input_file, "%lf", &temp);
+			if(temp < 0 || temp > file_header.max_val) {
+				fprintf(stderr, "ERROR: Invalid data. Data value out of range\n\nClosing Program\n")
+			}
 			temp = temp / file_header.max_val;
 			if (j == 0) {
 				body_content[i].r = temp;
@@ -296,20 +299,28 @@ int read_p6(char *file_name) {
 		for(j = 0; j < 3; j++) {
 			// check if it's the end of the file
 			if(peek_next_char() == EOF) {
-				fprintf(stderr, "File ended earlier than expected - Missing Data\n\nClosing Program\n");
+				fprintf(stderr, "ERROR: File ended earlier than expected - Missing Data\n\nClosing Program\n");
 				printf("%d\n", i);
 				return 1;
 			}
 			first_byte = fgetc(input_file);
+			if(size == 1) {
+				if(first_byte < 0 || first_byte > file_header.max_val) {
+					fprintf(stderr, "ERROR: Invalid data. Data value out of range\n\nClosing Program\n")
+				}
+			}
 			if(size == 2) {
 				first_byte = first_byte << 8; // left shift the first byte
 				// check if it's the end of the file
 				if(peek_next_char() == EOF) {
-					fprintf(stderr, "File ended earlier than expected - Missing Data\n\nClosing Program\n");
+					fprintf(stderr, "ERROR: File ended earlier than expected - Missing Data\n\nClosing Program\n");
 					return 1;
 				}
 				second_byte = fgetc(input_file);
 				first_byte = first_byte + second_byte;
+				if(first_byte < 0 || first_byte > file_header.max_val) {
+					fprintf(stderr, "ERROR: Invalid data. Data value out of range\n\nClosing Program\n")
+				}
 			}
 			if(j == 0) {
 				body_content[i].r = (double)first_byte / file_header.max_val;
@@ -380,14 +391,14 @@ int write_p6(FILE* output_file) {
 int check_for_valid_arguments(int argc, char *argv[]) {
 	// Not enough Inputs
 	if(argc < 4) {
-		fprintf(stderr, "Invalid program usage, not enough parameters\n");
+		fprintf(stderr, "ERROR: Invalid program usage, not enough parameters\n");
 		fprintf(stderr, "\tCall should be \"./ppmrw [3|6] <input_file.ppm> <output_file.ppm>\"\n\n");
 		fprintf(stderr, "Closing Program\n");
 		return 1;
 	}
 	// Invalid first argument
 	if(strcmp(argv[1], "3") && strcmp(argv[1], "6")) {
-		fprintf(stderr, "Invalid input in first argument, value must be 3 or 6\n\n");
+		fprintf(stderr, "ERROR: Invalid input in first argument, value must be 3 or 6\n\n");
 		fprintf(stderr, "Closing Program\n");
 		return 2;
 	}
