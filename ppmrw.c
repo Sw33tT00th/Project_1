@@ -28,21 +28,16 @@ typedef struct Pixel {
 } Pixel;
 
 // FUNCTION SIGNATURES
-int read_header();
-int write_header(FILE* output_file, char *format);
-int read_p3();
-int write_p3(FILE* output_file);
-int read_p6(char *file_name);
-int write_p6(FILE* output_file);
+int read_header(FILE* input_file, Header *file_header);
+int write_header(FILE* output_file, char *format, Header file_header);
+int read_p3(FILE* input_file, Header file_header, Pixel *body_content);
+int write_p3(FILE* output_file, Header file_header, Pixel *body_content);
+int read_p6(char *file_name, FILE* input_file, Header file_header, Pixel *body_content);
+int write_p6(FILE* output_file, Header file_header, Pixel *body_content);
 int check_for_valid_arguments(int argc, char *argv[]);
 int file_exists(char *file_name);
-int peek_next_char();
-void handle_comment();
-
-// GLOBAL VARIABLES
-FILE* input_file;
-Header file_header;
-Pixel *body_content;
+int peek_next_char(FILE* input_file);
+void handle_comment(FILE* input_file);
 
 
 /******************************************************************************
@@ -53,6 +48,7 @@ Pixel *body_content;
 *		- an output destination that ends with the .ppm file extention
 ******************************************************************************/
 int main(int argc, char *argv[]) {
+	Header file_header;
 	int error_check;
 	// ERROR CHECKING FOR INPUTS
 	error_check = check_for_valid_arguments(argc, argv);
@@ -62,22 +58,21 @@ int main(int argc, char *argv[]) {
 		fprintf(stderr, "ERROR: Input file does not exist\n\nClosing Program\n");
 		return 1;
 	}
-	input_file = fopen(argv[2], "r");
+	FILE* input_file = fopen(argv[2], "r");
 
-	error_check = read_header();
+	error_check = read_header(input_file, &file_header);
 	if(error_check) {
 		fclose(input_file);
 		return 1;
 	}
 	// initilize the body content array
-	Pixel content[file_header.width * file_header.height];
-	body_content = content;
+	Pixel body_content[file_header.width * file_header.height];
 	// check if the file input was P3 or P6
 	if(strcmp(file_header.magic_number, "P3") == 0) {
-		error_check = read_p3();
+		error_check = read_p3(input_file, file_header, body_content);
 	}
 	else {
-		error_check = read_p6(argv[2]);
+		error_check = read_p6(argv[2], input_file, file_header, body_content);
 	}
 
 	if(error_check) {
@@ -89,13 +84,13 @@ int main(int argc, char *argv[]) {
 
 	// Open new file for output and write header
 	FILE* output_file = fopen(argv[3], "w");
-	write_header(output_file, argv[1]);
+	write_header(output_file, argv[1], file_header);
 	// check which output format was specified
 	if(strcmp(argv[1], "3") == 0) {
-		error_check = write_p3(output_file);
+		error_check = write_p3(output_file, file_header, body_content);
 	}
 	else {
-		error_check = write_p6(output_file);
+		error_check = write_p6(output_file, file_header, body_content);
 	}
 	// handle error response from write function
 	if(error_check) {
@@ -118,51 +113,50 @@ int main(int argc, char *argv[]) {
 *				4 if the file has a height less than 1px
 *				5 if the maximum color value is outside of the range [1, 65535]
 ******************************************************************************/
-int read_header() {
-
+int read_header(FILE* input_file, Header *file_header) {
 	// read in the magic number
-	file_header.magic_number[0] = fgetc(input_file);
+	file_header->magic_number[0] = fgetc(input_file);
 	// check if first character is P
-	if(file_header.magic_number[0] != 'P') {
+	if(file_header->magic_number[0] != 'P') {
 		fprintf(stderr, "ERROR: Invalid File:\n\tFile is not in the PPM format\n\nClosing Program\n");
 		return 1;
 	}
-	file_header.magic_number[1] = fgetc(input_file);
+	file_header->magic_number[1] = fgetc(input_file);
 	// check if second character is 3 or 6
-	if(file_header.magic_number[1] != '3' && file_header.magic_number[1] != '6') {
+	if(file_header->magic_number[1] != '3' && file_header->magic_number[1] != '6') {
 		fprintf(stderr, "ERROR: Invalid File:\n\tFile is neither P3 or P6\n\nClosing Program\n");
 		return 2;
 	}
 	int i;
 	for(i = 0; i < 3; i++) {
 		// walk through whitespace and comments and store none of it
-		while(isspace(peek_next_char())) {
+		while(isspace(peek_next_char(input_file))) {
 			fgetc(input_file);
-			if(peek_next_char() == '#') { handle_comment(); }
+			if(peek_next_char(input_file) == '#') { handle_comment(input_file); }
 		}
 		// get the width data
 		if(i == 0) {
-			fscanf(input_file, "%d", &file_header.width);
+			fscanf(input_file, "%d", &(file_header->width));
 			// check if Width value is valid
-			if(file_header.width < 1) {
+			if(file_header->width < 1) {
 				fprintf(stderr, "ERROR: Invalid image width, must be at least 1px wide\n\nClosing Program\n");
 				return 3;
 			}
 		}
 		// get the height data
 		if(i == 1) {
-			fscanf(input_file, "%d", &file_header.height);
+			fscanf(input_file, "%d", &(file_header->height));
 			// check if height value is valid
-			if(file_header.height < 1) {
+			if(file_header->height < 1) {
 				fprintf(stderr, "ERROR: Invalid image height, must be at least 1px high\n\nClosing Program\n");
 				return 4;
 			}
 		}
 		// get the maximum value data
 		if(i == 2) {
-			fscanf(input_file, "%d", &file_header.max_val);
+			fscanf(input_file, "%d", &(file_header->max_val));
 			// check if the maximum color value is valid
-			if(file_header.max_val < 1 || file_header.max_val > 65535) {
+			if(file_header->max_val < 1 || file_header->max_val > 65535) {
 				fprintf(stderr, "ERROR: Invalid maximum color value, must be between 1 and 65535\n\nClosing Program\n");
 				return 5;
 			}
@@ -170,9 +164,9 @@ int read_header() {
 		
 	}
 	// walk through whitespace and comments and store none of it
-	while(isspace(peek_next_char())) {
+	while(isspace(peek_next_char(input_file))) {
 		fgetc(input_file);
-		if(peek_next_char() == '#') { handle_comment(); }
+		if(peek_next_char(input_file) == '#') { handle_comment(input_file); }
 	}
 	//printf("Magic Number: %s\nWidth: %d\nHeight: %d\nMaximum Color Value: %d\n", file_header.magic_number, file_header.width, file_header.height, file_header.max_val);
 	return 0;
@@ -185,7 +179,7 @@ int read_header() {
 *				0 if all went well and all data was accounted for
 *				1 if the output file failed to open
 ******************************************************************************/
-int write_header(FILE* output_file, char *format) {
+int write_header(FILE* output_file, char *format, Header file_header) {
 	if (output_file == NULL) {
 		fprintf(stderr, "ERROR: Output File failed to open\n\nClosing Program\n");
 		return 1;
@@ -212,7 +206,7 @@ int write_header(FILE* output_file, char *format) {
 *				2 if the body contains invalid characters
 *				3 if the value found is less than 0 or greater than max_val
 ******************************************************************************/
-int read_p3() {
+int read_p3(FILE* input_file, Header file_header, Pixel *body_content) {
 	int i;
 	int j;
 	double temp;
@@ -220,16 +214,16 @@ int read_p3() {
 
 		for (j = 0; j < 3; j++) {
 			// find the next non whitespace character
-			while(isspace(peek_next_char())) {
+			while(isspace(peek_next_char(input_file))) {
 				fgetc(input_file);
 			}
 			// check if it's the end of the file
-			if(peek_next_char() == EOF) {
+			if(peek_next_char(input_file) == EOF) {
 				fprintf(stderr, "ERROR: File ended earlier than expected - Missing Data\n\nClosing Program\n");
 				return 1;
 			}
 			// check if the next value is a number
-			if(!isdigit(peek_next_char())) {
+			if(!isdigit(peek_next_char(input_file))) {
 				fprintf(stderr, "ERROR: Invalid data in image content\n\nClosing Program\n");
 				return 2;
 			}
@@ -259,7 +253,7 @@ int read_p3() {
 * Return Value:
 *				0 if all went well and all data was accounted for.
 ******************************************************************************/
-int write_p3(FILE* output_file) {
+int write_p3(FILE* output_file, Header file_header, Pixel *body_content) {
 	char temp[80];
 	int i;
 	
@@ -278,7 +272,7 @@ int write_p3(FILE* output_file) {
 *				1 if the end of the file was found unexpectedly
 *				2 if the value found is less than 0 or greater than max_val
 ******************************************************************************/
-int read_p6(char *file_name) {
+int read_p6(char *file_name, FILE* input_file, Header file_header, Pixel *body_content) {
 	int size;
 	int first_byte;
 	int second_byte;
@@ -301,7 +295,7 @@ int read_p6(char *file_name) {
 	for(i = 0; i < (file_header.width * file_header.height); i++) {
 		for(j = 0; j < 3; j++) {
 			// check if it's the end of the file
-			if(peek_next_char() == EOF) {
+			if(peek_next_char(input_file) == EOF) {
 				fprintf(stderr, "ERROR: File ended earlier than expected - Missing Data\n\nClosing Program\n");
 				printf("%d\n", i);
 				return 1;
@@ -316,7 +310,7 @@ int read_p6(char *file_name) {
 			if(size == 2) {
 				first_byte = first_byte << 8; // left shift the first byte
 				// check if it's the end of the file
-				if(peek_next_char() == EOF) {
+				if(peek_next_char(input_file) == EOF) {
 					fprintf(stderr, "ERROR: File ended earlier than expected - Missing Data\n\nClosing Program\n");
 					return 1;
 				}
@@ -349,7 +343,7 @@ int read_p6(char *file_name) {
 * Return Value:
 *				0 if all went well and all data was accounted for.
 ******************************************************************************/
-int write_p6(FILE* output_file) {
+int write_p6(FILE* output_file, Header file_header, Pixel *body_content) {
 	int i;
 	int j;
 	int val;
@@ -430,7 +424,7 @@ int file_exists(char *file_name) {
 * Purpose: Check what the next character in a stream is
 * Return Value: Returns the next character in the input_file stream.
 ******************************************************************************/
-int peek_next_char() {
+int peek_next_char(FILE* input_file) {
 	int c;
 	c = fgetc(input_file);
 	ungetc(c, input_file);
@@ -441,8 +435,8 @@ int peek_next_char() {
 * HANDLE COMMENT
 * Purpose: move the file pointer past the end of a comment
 ******************************************************************************/
-void handle_comment() {
-	while(peek_next_char() != '\n') {
+void handle_comment(FILE* input_file) {
+	while(peek_next_char(input_file) != '\n') {
 		fgetc(input_file);
 	}
 }
